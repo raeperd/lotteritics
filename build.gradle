@@ -1,0 +1,133 @@
+plugins {
+    id 'org.springframework.boot' version '2.4.4'
+    id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+    id "org.sonarqube" version "3.1.1"
+    id 'com.google.cloud.tools.jib' version '2.6.0'
+    id 'org.asciidoctor.convert' version '1.5.10'
+    id 'jacoco'
+    id 'org.jetbrains.kotlin.jvm' version '1.4.31'
+    id 'org.jetbrains.kotlin.plugin.spring' version '1.4.31'
+}
+
+apply plugin: 'groovy'
+
+group = 'io.github.raeperd'
+version = '0.1.1'
+sourceCompatibility = '11'
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+sonarqube {
+    properties {
+        property "sonar.projectKey", "raeperd_lotteritics"
+        property "sonar.organization", "raeperd"
+        property "sonar.host.url", "https://sonarcloud.io"
+    }
+}
+
+dependencies {
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+    annotationProcessor 'org.projectlombok:lombok'
+    compileOnly 'org.projectlombok:lombok'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-data-rest'
+    runtimeOnly 'com.h2database:h2'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.restdocs:spring-restdocs-mockmvc'
+    asciidoctor 'org.springframework.restdocs:spring-restdocs-asciidoctor'
+}
+
+springBoot {
+    buildInfo()
+}
+
+ext {
+    snippetsDir = file('build/generated-snippets')
+}
+
+test {
+    outputs.dir snippetsDir
+        useJUnitPlatform()
+    finalizedBy 'asciidoctor'
+    finalizedBy 'jacocoTestReport'
+}
+
+asciidoctor {
+    inputs.dir snippetsDir
+        dependsOn test
+}
+
+jacocoTestReport {
+    reports {
+        xml.enabled true
+    }
+    finalizedBy 'jacocoTestCoverageVerification'
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            element = 'PACKAGE'
+
+            limit {
+                counter = 'CLASS'
+                value = 'COVEREDRATIO'
+                maximum = 1.00
+            }
+            limit {
+                counter = 'METHOD'
+                value = 'COVEREDRATIO'
+                minimum = 1.00
+            }
+            limit {
+                counter = 'INSTRUCTION'
+                value = 'COVEREDRATIO'
+                minimum = 1.00
+            }
+            excludes = [
+                'io.github.raeperd.lotteritics'
+            ]
+        }
+        rule {
+            element = "CLASS"
+
+            limit {
+                counter = 'LINE'
+                value = 'TOTALCOUNT'
+                maximum = 100
+            }
+        }
+        rule {
+            element = "METHOD"
+
+            limit {
+                counter = 'LINE'
+                value = 'TOTALCOUNT'
+                maximum = 10
+            }
+        }
+    }
+}
+
+jib {
+    from {
+        image = "openjdk:11.0.8-slim"
+    }
+    to {
+        image = "raeperd/${rootProject.name}"
+        tags = ["${project.version}".toString()]
+    }
+    container {
+        mainClass = "io.github.raeperd.lotteritics.LotteriticsApplication"
+        ports = ["8080"]
+    }
+}
